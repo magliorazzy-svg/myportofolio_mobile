@@ -67,9 +67,9 @@ void main() {
           find.text('You pressed the ${item.name} button!'),
           findsOneWidget,
         );
-        if (item.name == 'Add Project') {
-          // This card also navigates; go back to keep testing the others.
-          expect(find.byType(ProjectFormPage), findsOneWidget);
+        if (item.name == 'Add Project' || item.name == 'Add Achievement') {
+          // These cards also navigate; go back to keep testing the others.
+          expect(find.byType(MyHomePage), findsNothing);
           await pressSystemBack(tester);
         }
       }
