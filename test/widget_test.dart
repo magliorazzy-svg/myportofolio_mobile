@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:myportofolio_mobile/main.dart';
+import 'package:myportofolio_mobile/screens/achievement_form.dart';
 import 'package:myportofolio_mobile/screens/menu.dart';
 import 'package:myportofolio_mobile/screens/project_form.dart';
 import 'package:myportofolio_mobile/widgets/project_card.dart';
@@ -24,6 +25,42 @@ Future<void> openForm(WidgetTester tester) async {
   await tester.ensureVisible(find.text('Add Project'));
   await tester.tap(find.text('Add Project'));
   await settleRoute(tester);
+}
+
+Future<void> openAchievementForm(WidgetTester tester) async {
+  await tester.pumpWidget(const MyApp());
+  await tester.ensureVisible(find.text('Add Achievement'));
+  await tester.tap(find.text('Add Achievement'));
+  await settleRoute(tester);
+  // The card's SnackBar stays on screen for about 4 seconds; let it go away.
+  await tester.pump(const Duration(seconds: 5));
+  await tester.pumpAndSettle();
+}
+
+/// The four text inputs of the achievement form, in screen order.
+Finder titleField() => find.byType(TextFormField).at(0);
+Finder eventField() => find.byType(TextFormField).at(1);
+Finder descriptionField() => find.byType(TextFormField).at(2);
+Finder yearField() => find.byType(TextFormField).at(3);
+
+Future<void> fillAchievementForm(
+  WidgetTester tester, {
+  String title = 'Gold Medalist of Math Competition',
+  String event = 'ONSB 2025',
+  String description = 'Won the gold medal.',
+  String year = '2025',
+}) async {
+  await tester.enterText(titleField(), title);
+  await tester.enterText(eventField(), event);
+  await tester.enterText(descriptionField(), description);
+  await tester.enterText(yearField(), year);
+}
+
+Future<void> pressSave(WidgetTester tester) async {
+  await tester.ensureVisible(find.text('Save'));
+  await tester.tap(find.text('Save'));
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 300));
 }
 
 void main() {
@@ -201,6 +238,191 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
       expect(find.byType(AlertDialog), findsNothing);
       expect(find.text('My Portfolio App'), findsNothing);
+    });
+  });
+
+  group('Achievement form', () {
+    testWidgets('the Add Achievement card opens the form, Back returns home', (
+      tester,
+    ) async {
+      await openAchievementForm(tester);
+
+      expect(find.byType(AchievementFormPage), findsOneWidget);
+      expect(find.text('Add Achievement Form'), findsOneWidget);
+
+      await pressSystemBack(tester);
+      expect(find.byType(AchievementFormPage), findsNothing);
+      expect(find.byType(MyHomePage), findsOneWidget);
+    });
+
+    testWidgets(
+      'the drawer opens the form and Home returns to the home screen',
+      (tester) async {
+        await tester.pumpWidget(const MyApp());
+
+        await tester.tap(find.byTooltip('Open navigation menu'));
+        await tester.pumpAndSettle();
+        // The drawer keeps Home and Add Project and adds Add Achievement.
+        expect(find.widgetWithText(ListTile, 'Home'), findsOneWidget);
+        expect(find.widgetWithText(ListTile, 'Add Project'), findsOneWidget);
+        await tester.tap(find.widgetWithText(ListTile, 'Add Achievement'));
+        await tester.pumpAndSettle();
+        expect(find.byType(AchievementFormPage), findsOneWidget);
+
+        // The same drawer is on the form, and Home goes back to the home screen.
+        await tester.tap(find.byTooltip('Open navigation menu'));
+        await tester.pumpAndSettle();
+        expect(
+          find.widgetWithText(ListTile, 'Add Achievement'),
+          findsOneWidget,
+        );
+        await tester.tap(find.widgetWithText(ListTile, 'Home'));
+        await tester.pumpAndSettle();
+        expect(find.byType(MyHomePage), findsOneWidget);
+        expect(find.byType(AchievementFormPage), findsNothing);
+      },
+    );
+
+    testWidgets('has at least three inputs matching the Achievement model', (
+      tester,
+    ) async {
+      await openAchievementForm(tester);
+
+      expect(find.byType(TextFormField), findsNWidgets(4));
+      expect(find.byType(DropdownButtonFormField<String>), findsOneWidget);
+      for (final label in [
+        'Title',
+        'Event',
+        'Category',
+        'Description',
+        'Year',
+      ]) {
+        expect(find.text(label), findsOneWidget);
+      }
+    });
+
+    testWidgets('Save with every field empty shows an error for each field', (
+      tester,
+    ) async {
+      await openAchievementForm(tester);
+      await pressSave(tester);
+
+      expect(find.text('Enter the title.'), findsOneWidget);
+      expect(find.text('Enter the event.'), findsOneWidget);
+      expect(find.text('Enter the description.'), findsOneWidget);
+      expect(find.text('Enter the year.'), findsOneWidget);
+      expect(find.byType(AlertDialog), findsNothing);
+    });
+
+    testWidgets('rejects values that are only spaces', (tester) async {
+      await openAchievementForm(tester);
+      await fillAchievementForm(tester, title: '   ', event: '  ');
+      await pressSave(tester);
+
+      expect(find.text('Enter the title.'), findsOneWidget);
+      expect(find.text('Enter the event.'), findsOneWidget);
+      expect(find.byType(AlertDialog), findsNothing);
+    });
+
+    testWidgets('rejects HTML tags and text longer than 255 characters', (
+      tester,
+    ) async {
+      await openAchievementForm(tester);
+      await fillAchievementForm(
+        tester,
+        title: '<b>Winner</b>',
+        event: 'a' * 256,
+      );
+      await pressSave(tester);
+
+      expect(
+        find.text('The title must not contain HTML tags.'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('The event must be at most 255 characters.'),
+        findsOneWidget,
+      );
+      expect(find.byType(AlertDialog), findsNothing);
+    });
+
+    for (final year in ['3000', '1800']) {
+      testWidgets('rejects the year $year (outside 1900 to 2100)', (
+        tester,
+      ) async {
+        await openAchievementForm(tester);
+        await fillAchievementForm(tester, year: year);
+        await pressSave(tester);
+
+        expect(
+          find.text('The year must be between 1900 and 2100.'),
+          findsOneWidget,
+        );
+        expect(find.byType(AlertDialog), findsNothing);
+      });
+    }
+
+    testWidgets('only digits can be typed in the year field', (tester) async {
+      await openAchievementForm(tester);
+      await fillAchievementForm(tester, year: '20a2');
+      await pressSave(tester);
+
+      // "20a2" becomes "202", which is below 1900 and is rejected.
+      expect(
+        find.text('The year must be between 1900 and 2100.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets(
+      'valid input shows every value in a dialog, OK resets the form',
+      (tester) async {
+        await openAchievementForm(tester);
+        await fillAchievementForm(tester);
+        // Pick the second category.
+        await tester.tap(find.byType(DropdownButtonFormField<String>));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Non-Academic').last);
+        await tester.pumpAndSettle();
+        await pressSave(tester);
+
+        expect(find.text('Achievement added successfully!'), findsOneWidget);
+        expect(
+          find.text('Title: Gold Medalist of Math Competition'),
+          findsOneWidget,
+        );
+        expect(find.text('Event: ONSB 2025'), findsOneWidget);
+        expect(find.text('Category: Non-Academic'), findsOneWidget);
+        expect(find.text('Description: Won the gold medal.'), findsOneWidget);
+        expect(find.text('Year: 2025'), findsOneWidget);
+
+        await tester.tap(find.text('OK'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        // Back on the (now empty) form.
+        expect(find.byType(AlertDialog), findsNothing);
+        expect(find.byType(AchievementFormPage), findsOneWidget);
+        // Every input is empty again (the hint text is not the field's value).
+        final values = tester
+            .widgetList<EditableText>(find.byType(EditableText))
+            .map((field) => field.controller.text);
+        expect(values.every((text) => text.isEmpty), isTrue);
+      },
+    );
+
+    testWidgets('Save stays reachable on a phone with the keyboard open', (
+      tester,
+    ) async {
+      addTearDown(tester.view.reset);
+      tester.view.devicePixelRatio = 1.0;
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+
+      await openAchievementForm(tester);
+      await pressSave(tester);
+
+      expect(find.text('Enter the title.'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
   });
 }
