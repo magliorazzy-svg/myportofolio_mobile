@@ -89,6 +89,50 @@ not required.
    initial values of state. Those need a hot restart (`R`), and changes to native code,
    assets declared in `pubspec.yaml`, or dependencies need a full restart.
 
+### Assignment 8
+
+1. `Navigator.push()` adds a new route on top of the stack, so the current screen stays
+   underneath and the Back button returns to it. `Navigator.pushReplacement()` replaces
+   the route that is on top with the new one, so the replaced screen cannot be returned
+   to. `Navigator.pop()` removes the route on top and shows the one below it. The Add
+   Achievement action card uses `Navigator.push()`, so the system Back button returns
+   to the home screen. The drawer options use `pushReplacement()`: the Home option
+   replaces the form with `MyHomePage()`, which takes the user back to the home screen
+   (the stack then holds two home routes, because the form was opened on top of the
+   first one, so Back from there shows the earlier home screen).
+
+2. Every screen is a `Scaffold` with an `AppBar` and `drawer: const LeftDrawer()`. The
+   `Scaffold` defines the page structure, the `AppBar` shows the title and the drawer
+   icon automatically, and the `Drawer` is one reusable widget, so the home screen and
+   both forms have the same navigation and only one place to change. The portfolio
+   colour is shared: `Colors.indigo` is the `AppBar` and Save button colour on the Add
+   Project and Add Achievement forms and the `DrawerHeader` colour, and the home
+   screen's `AppBar` uses `colorScheme.primary`, which comes from the same indigo seed
+   colour in `MaterialApp`.
+
+3. The form is a `Form` inside a `SingleChildScrollView`, with a `Column` of fields and
+   a full width Save button. Each field is wrapped in `Padding` so the fields are not
+   stuck to each other or to the screen edge, and a `SizedBox(width: double.infinity)`
+   makes the button as wide as the screen. The `SingleChildScrollView` is what handles
+   limited space: when the screen is narrow or the keyboard covers part of it, the
+   content scrolls instead of overflowing, so every field and the Save button stay
+   reachable. I also added extra padding at the bottom so Save can be scrolled above
+   the SnackBar that the action card shows when it opens the form.
+
+4. `GlobalKey<FormState>` is the handle to the form's state: it lets the Save button
+   reach the `Form` from outside the fields. Each `validator` is a function that
+   returns an error message for an invalid value or `null` for a valid one. Pressing
+   Save calls `_formKey.currentState!.validate()`, which runs every validator, shows
+   the messages next to the fields that failed, and returns `true` only when all of
+   them returned `null`. Only then does the dialog open. For example, the form rejects
+   the year `3000` (the model only allows 1900 to 2100), a title of only spaces, and a
+   title such as `<b>Winner</b>`. Choosing an input widget or keyboard type is not
+   enough: the number keyboard and `digitsOnly` only stop letters from being typed, but
+   `3000` is made of digits and still gets through, they do not apply to pasted or
+   programmatic input on every platform, and they cannot express rules such as
+   "required", "not only spaces", the maximum length, or the allowed range. Those rules
+   have to be checked by the validator.
+
 ## AI Usage Disclosure
 
 I used Claude Code (inside the Claude desktop app) for Tutorial 08 and Assignment 7.
@@ -110,3 +154,20 @@ found" because I had not created the GitHub repository yet; and the tutorial sec
 about installing the standalone Dart SDK with Homebrew was not needed because the
 Flutter SDK already includes Dart. Claude Code's own shell did not have Flutter on its
 `PATH`, so it ran Flutter by its full path instead.
+
+For Assignment 8 I used Claude Code again, this time to write a step by step guide for
+the assignment. It read the assignment page, chose the Achievements section, and wrote
+and tested a reference implementation in a copy of my project (`flutter analyze`,
+`flutter test`, and a web build checked in Chrome) before giving me the steps. I
+followed the guide and entered the code in my own project (the new
+`achievement_form.dart`, the new action card and drawer option, the tests, and the
+README answers), ran it in Chrome, and committed each step myself on an
+`assignment-8` branch.
+
+Limitations and fixes I noticed: while testing, Claude Code found that the SnackBar of
+the action card stays on screen for about four seconds after the form opens and covers
+the bottom of the form, so I added bottom padding to the scrolling area so Save can be
+scrolled above it; a first version of one test failed only because the hint text of the
+title field was identical to the sample title I typed, not because of a bug in the
+form; and Flutter's test font is much wider than the real one, so some overflow
+warnings appear only in tests, which is why I verified the layout in Chrome as well.
