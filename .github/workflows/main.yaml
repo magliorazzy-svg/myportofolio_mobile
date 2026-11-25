@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    uses: VeryGoodOpenSource/very_good_workflows/.github/workflows/flutter_package.yml@v2
+    with:
+      setup: dart run build_runner build --delete-conflicting-outputs
+      coverage_excludes: "**/*.g.dart"
+      min_coverage: 0
+      timeout_minutes: 15
+
+  build_apk:
+    # Only runs when the `build` job (format, analyze, tests) succeeded.
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Get dependencies
+        run: flutter pub get
+      - name: Generate the json_serializable code
+        run: dart run build_runner build --delete-conflicting-outputs
+      - name: Build the release APK
+        # An empty API_BASE_URL would override the default in config.dart, so
+        # the define is only passed when the repository variable is set.
+        run: |
+          if [ -n "${{ vars.API_BASE_URL }}" ]; then
+            flutter build apk --release --dart-define=API_BASE_URL=${{ vars.API_BASE_URL }}
+          else
+            flutter build apk --release
+          fi
+      - name: Upload the APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
